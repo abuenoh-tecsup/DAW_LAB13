@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Receta</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/templates/">
+            <i class="fas fa-utensils me-2"></i>Gestión de Recetas
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/templates/ingredientes-list">Ingredientes</a>
+            <a class="nav-link" href="/templates/recetas-list">Recetas</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-book me-2"></i>
+                        <span id="formTitle">Nueva Receta</span>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form id="recetaForm">
+                        <input type="hidden" id="recetaId">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="nombre" class="form-label">
+                                        <i class="fas fa-tag me-2"></i>Nombre de la Receta
+                                    </label>
+                                    <input type="text" class="form-control" id="nombre" name="nombre" required
+                                           placeholder="Ingrese el nombre de la receta">
+                                    <div class="invalid-feedback">
+                                        Por favor ingrese un nombre válido.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ingredientes" class="form-label">
+                                        <i class="fas fa-leaf me-2"></i>Ingredientes
+                                    </label>
+                                    <select class="form-select" id="ingredientes" multiple size="5">
+                                        <!-- Los ingredientes se cargarán dinámicamente -->
+                                    </select>
+                                    <div class="form-text">
+                                        Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples ingredientes
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="descripcion" class="form-label">
+                                <i class="fas fa-align-left me-2"></i>Descripción
+                            </label>
+                            <textarea class="form-control" id="descripcion" name="descripcion" rows="4"
+                                      placeholder="Ingrese la descripción de la receta"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6><i class="fas fa-list me-2"></i>Ingredientes Seleccionados:</h6>
+                            <div id="ingredientesSeleccionados" class="border rounded p-3 bg-light">
+                                <em class="text-muted">No hay ingredientes seleccionados</em>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/templates/recetas-list" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-save me-2"></i>Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    let isEditing = false;
+    let recetaId = null;
+    let todosLosIngredientes = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        cargarIngredientes();
+
+        // Verificar si estamos editando
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('id');
+
+        if (id) {
+            isEditing = true;
+            recetaId = id;
+            document.getElementById('formTitle').textContent = 'Editar Receta';
+            document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save me-2"></i>Actualizar';
+            setTimeout(() => cargarReceta(id), 500); // Esperar a que se carguen los ingredientes
+        }
+
+        // Listener para cambios en la selección de ingredientes
+        document.getElementById('ingredientes').addEventListener('change', actualizarIngredientesSeleccionados);
+
+        // Listener para el submit del formulario
+        document.getElementById('recetaForm').addEventListener('submit', manejarSubmit);
+    });
+
+    async function cargarIngredientes() {
+        try {
+            const response = await fetch('/api/ingredientes');
+            const ingredientes = await response.json();
+            todosLosIngredientes = ingredientes;
+
+            const select = document.getElementById('ingredientes');
+            select.innerHTML = '';
+
+            ingredientes.forEach(ingrediente => {
+                const option = document.createElement('option');
+                option.value = ingrediente.id;
+                option.textContent = ingrediente.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error al cargar ingredientes:', error);
+            alert('Error al cargar los ingredientes');
+        }
+    }
+
+    async function cargarReceta(id) {
+        try {
+            const response = await fetch(`/api/recetas/${id}`);
+            if (response.ok) {
+                const receta = await response.json();
+
+                // Llenar el formulario con los datos de la receta
+                document.getElementById('recetaId').value = receta.id;
+                document.getElementById('nombre').value = receta.nombre;
+                document.getElementById('descripcion').value = receta.descripcion || '';
+
+                // Seleccionar los ingredientes correspondientes
+                const select = document.getElementById('ingredientes');
+                const ingredientesIds = receta.ingredientes ? receta.ingredientes.map(ing => ing.id.toString()) : [];
+
+                Array.from(select.options).forEach(option => {
+                    option.selected = ingredientesIds.includes(option.value);
+                });
+
+                // Actualizar la visualización de ingredientes seleccionados
+                actualizarIngredientesSeleccionados();
+            } else {
+                alert('Error al cargar la receta');
+            }
+        } catch (error) {
+            console.error('Error al cargar receta:', error);
+            alert('Error al cargar la receta');
+        }
+    }
+
+    function actualizarIngredientesSeleccionados() {
+        const select = document.getElementById('ingredientes');
+        const selectedOptions = Array.from(select.selectedOptions);
+        const container = document.getElementById('ingredientesSeleccionados');
+
+        if (selectedOptions.length === 0) {
+            container.innerHTML = '<em class="text-muted">No hay ingredientes seleccionados</em>';
+            return;
+        }
+
+        const ingredientesHtml = selectedOptions.map(option =>
+            `<span class="badge bg-primary me-2 mb-2">
+                    <i class="fas fa-leaf me-1"></i>${option.textContent}
+                </span>`
+        ).join('');
+
+        container.innerHTML = ingredientesHtml;
+    }
+
+    async function manejarSubmit(event) {
+        event.preventDefault();
+
+        const form = event.target;
+        const formData = new FormData(form);
+
+        // Validar que se haya ingresado un nombre
+        const nombre = formData.get('nombre').trim();
+        if (!nombre) {
+            document.getElementById('nombre').classList.add('is-invalid');
+            return;
+        } else {
+            document.getElementById('nombre').classList.remove('is-invalid');
+        }
+
+        // Obtener ingredientes seleccionados
+        const select = document.getElementById('ingredientes');
+        const ingredientesSeleccionados = Array.from(select.selectedOptions).map(option => ({
+            id: parseInt(option.value)
+        }));
+
+        // Construir el objeto receta
+        const receta = {
+            nombre: nombre,
+            descripcion: formData.get('descripcion') || '',
+            ingredientes: ingredientesSeleccionados
+        };
+
+        try {
+            let response;
+
+            if (isEditing) {
+                // Actualizar receta existente
+                response = await fetch(`/api/recetas/${recetaId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(receta)
+                });
+            } else {
+                // Crear nueva receta
+                response = await fetch('/api/recetas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(receta)
+                });
+            }
+
+            if (response.ok) {
+                alert(isEditing ? 'Receta actualizada correctamente' : 'Receta creada correctamente');
+                window.location.href = '/templates/recetas-list';
+            } else {
+                throw new Error('Error en la respuesta del servidor');
+            }
+
+        } catch (error) {
+            console.error('Error al guardar receta:', error);
+            alert('Error al guardar la receta. Por favor, intente nuevamente.');
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Recetas</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/templates/">
+            <i class="fas fa-utensils me-2"></i>Gestión de Recetas
+        </a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/templates/ingredientes-list">Ingredientes</a>
+            <a class="nav-link" href="/templates/recetas-list">Recetas</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-book me-2 text-primary"></i>Lista de Recetas</h2>
+        <a href="/templates/receta-form" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Nueva Receta
+        </a>
+    </div>
+
+    <div class="row" id="recetasContainer">
+        <!-- Las recetas se cargarán dinámicamente -->
+    </div>
+</div>
+
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que deseas eliminar esta receta?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalles de Receta -->
+<div class="modal fade" id="recetaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="recetaModalTitle">Detalles de la Receta</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="recetaModalBody">
+                <!-- Los detalles se cargarán dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    let recetaIdToDelete = null;
+
+    // Cargar recetas al iniciar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        cargarRecetas();
+    });
+
+    async function cargarRecetas() {
+        try {
+            const response = await fetch('/api/recetas');
+            const recetas = await response.json();
+
+            const container = document.getElementById('recetasContainer');
+            container.innerHTML = '';
+
+            if (recetas.length === 0) {
+                container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-info text-center">
+                                <i class="fas fa-info-circle me-2"></i>
+                                No hay recetas registradas aún.
+                            </div>
+                        </div>
+                    `;
+                return;
+            }
+
+            recetas.forEach(receta => {
+                const card = document.createElement('div');
+                card.className = 'col-md-6 col-lg-4 mb-4';
+
+                const ingredientesText = receta.ingredientes && receta.ingredientes.length > 0
+                    ? receta.ingredientes.map(ing => ing.nombre).join(', ')
+                    : 'Sin ingredientes';
+
+                card.innerHTML = `
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-utensils me-2"></i>${receta.nombre}
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    <strong>Descripción:</strong><br>
+                                    ${receta.descripcion || 'Sin descripción'}
+                                </p>
+                                <p class="card-text">
+                                    <strong>Ingredientes:</strong><br>
+                                    <small class="text-muted">${ingredientesText}</small>
+                                </p>
+                            </div>
+                            <div class="card-footer bg-light">
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-info btn-sm" onclick="verDetalles(${receta.id})">
+                                        <i class="fas fa-eye"></i> Ver
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" onclick="editarReceta(${receta.id})">
+                                        <i class="fas fa-edit"></i> Editar
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(${receta.id})">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                container.appendChild(card);
+            });
+        } catch (error) {
+            console.error('Error al cargar recetas:', error);
+            alert('Error al cargar las recetas');
+        }
+    }
+
+    async function verDetalles(id) {
+        try {
+            const response = await fetch(`/api/recetas/${id}`);
+            if (response.ok) {
+                const receta = await response.json();
+
+                document.getElementById('recetaModalTitle').textContent = receta.nombre;
+
+                const ingredientesList = receta.ingredientes && receta.ingredientes.length > 0
+                    ? receta.ingredientes.map(ing => `<li class="list-group-item">${ing.nombre}</li>`).join('')
+                    : '<li class="list-group-item text-muted">Sin ingredientes</li>';
+
+                document.getElementById('recetaModalBody').innerHTML = `
+                        <div class="mb-3">
+                            <h6><i class="fas fa-align-left me-2"></i>Descripción:</h6>
+                            <p class="ms-3">${receta.descripcion || 'Sin descripción'}</p>
+                        </div>
+                        <div class="mb-3">
+                            <h6><i class="fas fa-list me-2"></i>Ingredientes:</h6>
+                            <ul class="list-group">
+                                ${ingredientesList}
+                            </ul>
+                        </div>
+                    `;
+
+                const modal = new bootstrap.Modal(document.getElementById('recetaModal'));
+                modal.show();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al cargar los detalles de la receta');
+        }
+    }
+
+    function editarReceta(id) {
+        window.location.href = '/templates/receta-form?id=' + id;
+    }
+
+    function confirmarEliminar(id) {
+        recetaIdToDelete = id;
+        const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        modal.show();
+    }
+
+    document.getElementById('confirmDelete').addEventListener('click', async function() {
+        if (recetaIdToDelete) {
+            try {
+                const response = await fetch(`/api/recetas/${recetaIdToDelete}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+                    modal.hide();
+                    cargarRecetas();
+                    alert('Receta eliminada correctamente');
+                } else {
+                    alert('Error al eliminar la receta');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al eliminar la receta');
+            }
+        }
+    });
+</script>
+</body>
+</html>
