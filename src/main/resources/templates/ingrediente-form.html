@@ -59,7 +59,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="/templates/ingredientes-list" class="btn btn-secondary">
+                            <a href="/ingredientes-list" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Volver
                             </a>
                             <button type="submit" class="btn btn-success" id="submitBtn">
@@ -101,12 +101,12 @@
                 document.getElementById('nombre').value = ingrediente.nombre;
             } else {
                 alert('Error al cargar el ingrediente');
-                window.location.href = '/templates/ingredientes-list';
+                window.location.href = '/ingredientes-list';
             }
         } catch (error) {
             console.error('Error:', error);
             alert('Error al cargar el ingrediente');
-            window.location.href = '/templates/ingredientes-list';
+            window.location.href = '/ingredientes-list';
         }
     }
 
@@ -148,7 +148,7 @@
 
             if (response.ok) {
                 alert(isEditing ? 'Ingrediente actualizado correctamente' : 'Ingrediente creado correctamente');
-                window.location.href = '/templates/ingredientes-list';
+                window.location.href = '/ingredientes-list';
             } else {
                 alert('Error al guardar el ingrediente');
             }

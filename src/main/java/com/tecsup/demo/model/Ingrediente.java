@@ -1,5 +1,6 @@
 package com.tecsup.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -12,6 +13,7 @@ public class Ingrediente {
     private String nombre;
 
     @ManyToMany(mappedBy = "ingredientes")
+    @JsonIgnore
     private List<Receta> recetas;
 
     public Long getId() {
